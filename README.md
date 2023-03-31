@@ -1,0 +1,2 @@
+# synergy-launcher
+PWA launcher
