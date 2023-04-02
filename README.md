@@ -1,2 +1,2 @@
-# synergy-launcher
-PWA launcher
+# pwatest
+pwa
