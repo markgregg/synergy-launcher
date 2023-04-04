@@ -1,4 +1,6 @@
 import { useState, KeyboardEvent, ChangeEvent } from 'react';
+import { getApps } from 'synergy-client/lib/esm/clientApi/client';
+import { RegisteredClient } from 'synergy-client/lib/esm/synergyApi/RegisteredClient';
 import './App.css';
 
 interface Option {
@@ -73,11 +75,39 @@ const config: Config = {
   ]
 }
 
+const getMatchingApps = async (filter: string): Promise<RegisteredClient[]> => {
+  return new Promise( (resolve,reject) => {
+    try {
+      getApps(filter)
+        .then( apps =>  resolve(apps))
+        .catch(error =>  reject(error));
+    } catch(error) {
+      reject(error);
+    }
+  });
+}
+
+const interface 
+
+
+/*
+  Text (^p/!p)App:(^/!)Test App
+              Action:(^/|)Buy
+              Context:(^/|)USD/GBP
+*/
+
 const App = () => {
   const [inputText,setInputText] = useState<string>("");
+  const []
 
   const textChanged = (event: ChangeEvent<HTMLInputElement>) => {
-
+    const end = event.target.selectionStart ?? 0;
+    let start = end;
+    while( start > 0 && (event.target.value.charAt(start) !== ' ')) start--; 
+    const word = event.target.value.substring(start);
+    getMatchingApps(word)
+      .then( apps => )
+      .catch( error => console.log(error));
     setInputText(event.target.value);
   }
 
