@@ -23,8 +23,16 @@ interface Field {
   valueFunction?: string; //javascript run using eval
 }
 
+enum Case {
+  Lower,
+  Upper
+}
+
 interface Intent {
   triggers: string[]; //if matches a field then value is used in field
+  triggerField?: string;
+  ignoreCase?: boolean; //defaults to true
+  adjustCase?: Case;
   donmain?: string;
   subDomain?: string;
   action: string;
@@ -36,9 +44,10 @@ interface Interest {
   subDomain?: string;
   topic: string;
   body?: string; //choice
+  service?: Service | FunctionCall;
 }
 
-type ServiceCall = (param: string) => any[];
+type FunctionCall = (param: string) => Promise<any[]>;
 
 interface Service {
   endPoint: string;
@@ -48,8 +57,8 @@ interface Service {
 interface Choice {
   key: string;
   ignoreCase?: boolean; //defaults to true
-  options: Option[] | string[];
-  service?: Service | ServiceCall;
+  options?: Option[] | string[];
+  service?: Service | FunctionCall;
 }
 
 interface Config {
@@ -58,11 +67,62 @@ interface Config {
   intents: Intent[];
 }
 
+const currencyPairs = [
+  'USD/GBP',
+  'GBP/EUR',
+  'EUR/USD',
+  'GBP/JPY',
+  'USD/JPY',
+  'GBP/AUD',
+  'GBP/BRL',
+  'GBP/CAD',
+  'GBP/CHF',
+  'GBP/CNY',
+  'GBP/INR',
+  'GBP/NOK',
+  'GBP/QAR',
+  'GBP/ZAR',
+  'EUR/CHF',
+  'EUR/CAD',
+  'EUR/JPY',
+  'EUR/SEK',
+  'EUR/HUF',
+  'USD/CAD',
+  'USD/HKD',
+  'USD/SGD',
+  'USD/INR',
+  'USD/MXN',
+  'USD/CNY',
+  'USD/CHF'
+  ];
+
+const getCcyPair = (param: string): Promise<any[]> => {
+  return new Promise( (resolve,reject) => {
+    resolve(currencyPairs.filter( ccyPair => ccyPair.indexOf(param) !== -1));
+  });
+}
+
+const brokers = ["LHAM", "CHASE", "BARC", "POLIC", "SANT", "REND"];
+
+const getBroker = (param: string): Promise<any[]> => {
+  return new Promise( (resolve,reject) => {
+    resolve(brokers.filter( broker => broker.indexOf(param) !== -1));
+  });
+}
+
 const config: Config = {
   choices: [
     {
       key: 'side',
       options: ['BUY', 'SELL']
+    },
+    {
+      key: 'pair',
+      service: getCcyPair
+    },
+    {
+      key: 'broker',
+      service: getBroker
     }
   ],
   interests: [
@@ -70,12 +130,18 @@ const config: Config = {
   ],
   intents: [
     {
-      triggers: ['buy', 'sell'],
+      triggers: ['BUY', 'SELL'],
+      adjustCase: Case.Upper,
+      triggerField: 'side',
       action: 'test',
       fields: [
         {
-          name: 'side',
-          type: 'side'
+          name: 'pair',
+          type: 'pair'
+        },
+        {
+          name: 'broker',
+          type: 'broker'
         }
       ]
     }
@@ -104,11 +170,6 @@ interface InterestSelection {
   interest: Interest
   text: string;
 }
-enum SelectionType {
-  Interest,
-  Intent,
-  App
-}
 
 enum AdvanceDirection {
   Next,
@@ -117,39 +178,41 @@ enum AdvanceDirection {
 
 interface Selection {
   text?: string;
-  apps: RegisteredClient[];
-  intents: Intent[];
-  interests: Interest[];
-  intent?: Intent;
-  currentType?: SelectionType;
+  choices: Map<string,Intent[] | RegisteredClient[] | Interest[]>;
+  choice?: string;
   selection?: RegisteredClient | Intent | Interest;
+  intent?: Intent;
   options?: Option[];
 }
 
-const getType = (currentType: SelectionType): string => {
-  return currentType === SelectionType.App 
-    ? "App"
-    : currentType === SelectionType.Intent
-     ? "Action"
-     : "Context";
-}
 
 const hasSelections = (selection: Selection) => {
-  return selection.currentType === SelectionType.App
-    ? selection.apps.length > 1
-    : selection.currentType === SelectionType.Intent
-      ? selection.intents.length > 1
-      : selection.interests.length > 1;
+  return selection.choice && 
+    selection.choices.has(selection.choice) && 
+    (selection.choices.get(selection.choice!)?.length ?? 0) > 0;
+}
+
+const getIntentText = (intent: Intent, text: string): string => {
+  return (intent.triggers.find( trigger =>{
+    return (intent.ignoreCase ?? true) 
+      ? trigger.toLowerCase().indexOf(text.toLowerCase()) !== -1
+      : trigger.indexOf(text) !== -1
+  }) ?? intent.action)
+    .replace(
+      intent.adjustCase === Case.Lower
+        ? text.toLowerCase()
+        : intent.adjustCase === Case.Upper
+          ? text.toUpperCase()
+          : text, ""
+    );
 }
 
 const getSelectionText = (selection: RegisteredClient | Intent | Interest, text: string): string => {
-  const suggestion = "url" in selection
-    ? selection.name ?? selection.url
+  return "url" in selection
+    ? (selection.name ?? selection.url).replace(text,"")
     : "action" in selection
-      ? selection.action
-      : selection.topic;
-      console.log(`${suggestion} - ${text}`);
-  return suggestion.replace(text,"");
+      ? getIntentText(selection, text)
+      : selection.topic.replace(text,"");
 }
 
 const getIndex = <T extends object> (items: T[], item: T | undefined, direction: AdvanceDirection): number => {
@@ -167,20 +230,13 @@ const getIndex = <T extends object> (items: T[], item: T | undefined, direction:
 }
 
 const advance = (selection: Selection, refresh: () => void, direction: AdvanceDirection) => {
-  if( selection.currentType === SelectionType.App ) {
-    if( selection.apps.length > 1 && selection.selection) {
-      const idx = getIndex(selection.apps, selection.selection as RegisteredClient, direction);
-      selection.selection = selection.apps[idx];
+  if( selection.choice && selection.choices.has(selection.choice) ) {
+    const items = selection.choices.get(selection.choice);
+    if( items ) {
+      const idx = getIndex( items, selection.selection, direction);
+      selection.selection = items[idx];
       refresh();
-    } 
-  } else if ( selection.currentType === SelectionType.Intent ) {
-    const idx = getIndex(selection.intents, selection.selection as Intent, direction);
-    selection.selection = selection.apps[idx];
-    refresh();
-  } else {
-    const idx = getIndex(selection.interests, selection.selection as Interest, direction);
-    selection.selection = selection.apps[idx];
-    refresh();
+    }
   }
 }
 
@@ -195,9 +251,7 @@ const App = () => {
   const [inputText,setInputText] = useState<string>("");
   const selection = useRef<Selection>( 
     {
-      apps: [],
-      intents: [],
-      interests: []
+      choices: new Map()
     }
   );
   const [update,setUpdate] = useState<number>();
@@ -206,9 +260,11 @@ const App = () => {
 
   const clearSelection = () => {
     selection.current = {
-      apps: [],
-      intents: [],
-      interests: []
+      choices: new Map(),
+      choice: undefined,
+      selection: undefined,
+      intent: undefined,
+      options: undefined
     };
     refresh();
   }
@@ -221,21 +277,46 @@ const App = () => {
       getMatchingApps(searchText)
         .then( apps => {
           console.log(apps);
-          selection.current.apps = apps;
           if( apps.length === 0 ) {
-            if( selection.current.currentType === SelectionType.App ) {
-              selection.current.currentType = undefined;
-              selection.current.selection = undefined;
+            if( selection.current.choice === "APPS" ) {
+              selection.current.choice = undefined;
+              selection.current.choices.delete("APPS");
             }
           } else {
-            if( !selection.current.currentType ) {
-              selection.current.currentType = SelectionType.App;
+            if( !selection.current.choice ) {
+              selection.current.choice = "APPS";
+              selection.current.choices.set("APPS", apps)
               selection.current.selection = apps[0];
+              console.log(selection.current);
             }
           }
           refresh();
         })
         .catch( error => console.log(error));
+      config.intents.forEach( intent => {
+        const match = intent.triggers.find( trigger => {
+          return (intent.ignoreCase ?? true)
+            ? trigger.toLowerCase().indexOf(searchText.toLowerCase()) !== -1
+            : trigger.indexOf(searchText) !== -1
+        });
+        if( match ) {
+          if( !selection.current.choice ) {
+            selection.current.choice = intent.action;
+            selection.current.choices.set(intent.action, [intent])
+            selection.current.selection = intent;
+          }
+        } else {
+          if( selection.current.choice === intent.action ) {
+            selection.current.choice = undefined;
+            selection.current.choices.delete(intent.action);
+          }
+        }
+
+      });
+
+      config.interests.forEach( intent => {
+
+      });
     }
   }
 
@@ -321,12 +402,10 @@ const App = () => {
               </span>
             }
             {
-              selection.current.currentType && <span className="suggestionText">{getType(selection.current.currentType)}:</span>
+              selection.current.choice && <span className="suggestionText">{selection.current.choice}:</span>
             }
             {
-              ((selection.current.intents.length > 0 && selection.current.interests.length > 0) ||
-              (selection.current.intents.length > 0 && selection.current.apps.length > 0) ||
-              (selection.current.interests.length > 0 && selection.current.apps.length > 0)) &&
+              (selection.current.choices.size > 1) &&
               <span className="iconGroup">
                 <MdOutlineKeyboardDoubleArrowUp className="iconTop"/>
                 <MdOutlineKeyboardDoubleArrowDown className="iconBottom"/>
