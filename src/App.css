@@ -15,12 +15,49 @@
 }
 
 .searchContainer {
-  display: flex;
   padding: 10px;
   padding-bottom: 20px;
+}
+
+.innerContainer {
+  position: relative;
+  display: flex;
 }
 
 .search {
   flex: 1;
   border-radius: 5px;
+}
+
+.textMenu {
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  top: -2px;
+  left: 3px;
+}
+
+.textCopy {
+  visibility: hidden;
+  margin-right: 2px;
+}
+
+.iconGroup {
+  font-size: small;
+  margin-right: 12px;
+}
+
+.iconTop {
+  position: absolute;
+  top: 0;
+}
+
+.iconBottom {
+  position: absolute;
+  bottom: 0;
+}
+
+.suggestionText {
+  color: #5e5b5b;
 }
