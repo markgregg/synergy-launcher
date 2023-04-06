@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent, ChangeEvent, useRef } from 'react';
+import { useState, KeyboardEvent, ChangeEvent, useRef, useDebugValue } from 'react';
 import { getApps, launchPwa } from 'synergy-client';
 import { RegisteredClient } from 'synergy-client';
 import { 
@@ -10,9 +10,8 @@ import './App.css';
 import { current } from '@reduxjs/toolkit';
 
 interface Option {
-  key?: string; //if missing then value
   display?: string; //if missing then value
-  value: any;
+  value: string;
 }
 
 interface Field {
@@ -47,7 +46,7 @@ interface Interest {
   service?: Service | FunctionCall;
 }
 
-type FunctionCall = (param: string) => Promise<any[]>;
+type FunctionCall = (param: string) => Promise<Option[]>;
 
 interface Service {
   endPoint: string;
@@ -57,7 +56,7 @@ interface Service {
 interface Choice {
   key: string;
   ignoreCase?: boolean; //defaults to true
-  options?: Option[] | string[];
+  options?: Option[];
   service?: Service | FunctionCall;
 }
 
@@ -68,45 +67,54 @@ interface Config {
 }
 
 const currencyPairs = [
-  'USD/GBP',
-  'GBP/EUR',
-  'EUR/USD',
-  'GBP/JPY',
-  'USD/JPY',
-  'GBP/AUD',
-  'GBP/BRL',
-  'GBP/CAD',
-  'GBP/CHF',
-  'GBP/CNY',
-  'GBP/INR',
-  'GBP/NOK',
-  'GBP/QAR',
-  'GBP/ZAR',
-  'EUR/CHF',
-  'EUR/CAD',
-  'EUR/JPY',
-  'EUR/SEK',
-  'EUR/HUF',
-  'USD/CAD',
-  'USD/HKD',
-  'USD/SGD',
-  'USD/INR',
-  'USD/MXN',
-  'USD/CNY',
-  'USD/CHF'
+  {value: 'USD/GBP'},
+  {value: 'GBP/EUR'},
+  {value: 'EUR/USD'},
+  {value: 'GBP/JPY'},
+  {value: 'USD/JPY'},
+  {value: 'GBP/AUD'},
+  {value: 'GBP/BRL'},
+  {value: 'GBP/CAD'},
+  {value: 'GBP/CHF'},
+  {value: 'GBP/CNY'},
+  {value: 'GBP/INR'},
+  {value: 'GBP/NOK'},
+  {value: 'GBP/QAR'},
+  {value: 'GBP/ZAR'},
+  {value: 'EUR/CHF'},
+  {value: 'EUR/CAD'},
+  {value: 'EUR/JPY'},
+  {value: 'EUR/SEK'},
+  {value: 'EUR/HUF'},
+  {value: 'USD/CAD'},
+  {value: 'USD/HKD'},
+  {value: 'USD/SGD'},
+  {value: 'USD/INR'},
+  {value: 'USD/MXN'},
+  {value: 'USD/CNY'},
+  {value: 'USD/CHF'}
   ];
 
-const getCcyPair = (param: string): Promise<any[]> => {
+const getCcyPair = (param: string): Promise<Option[]> => {
+  console.log(param);
   return new Promise( (resolve,reject) => {
-    resolve(currencyPairs.filter( ccyPair => ccyPair.indexOf(param) !== -1));
+    resolve(currencyPairs.filter( ccyPair => ccyPair.value.toLowerCase().startsWith(param.toLowerCase())));
   });
 }
 
-const brokers = ["LHAM", "CHASE", "BARC", "POLIC", "SANT", "REND"];
+const brokers = [
+  {value: "LHAM"}, 
+  {value: "CHASE"}, 
+  {value: "BARC"}, 
+  {value: "POLIC"}, 
+  {value: "SANT"}, 
+  {value: "REND"}
+];
 
-const getBroker = (param: string): Promise<any[]> => {
+const getBroker = (param: string): Promise<Option[]> => {
+  console.log(param);
   return new Promise( (resolve,reject) => {
-    resolve(brokers.filter( broker => broker.indexOf(param) !== -1));
+    resolve(brokers.filter( broker => broker.value.toLowerCase().startsWith(param.toLowerCase())));
   });
 }
 
@@ -114,7 +122,7 @@ const config: Config = {
   choices: [
     {
       key: 'side',
-      options: ['BUY', 'SELL']
+      options: [{value: 'BUY'}, {value: 'SELL'}]
     },
     {
       key: 'pair',
@@ -194,6 +202,12 @@ const hasSelections = (selection: Selection) => {
     (selection.choices.get(selection.choice!)?.length ?? 0) > 0;
 }
 
+const hasOptions = (selection: Selection) => {
+  return selection.option && 
+    selection.options.has(selection.option) && 
+    (selection.options.get(selection.option!)?.length ?? 0) > 0;
+} 
+
 const getIntentText = (intent: Intent, text: string): string => {
   const intentText = (intent.triggers.find( trigger =>{
     return (intent.ignoreCase ?? true) 
@@ -212,6 +226,12 @@ const getSelectionText = (selection: RegisteredClient | Intent | Interest, text:
     : "action" in selection
       ? getIntentText(selection, text)
       : selection.topic.replace(text,"");
+}
+
+const getOptionText  = (option: Option, text: string): string => {
+  const idx = (option.display ?? option.value).toLowerCase().indexOf(text.toLowerCase());
+  const removeText = (option.display ?? option.value).slice(idx,text.length);
+  return (option.display ?? option.value).replace(removeText,"");
 }
 
 const getIdx = <T extends RegisteredClient | Intent | Interest> (
@@ -301,6 +321,65 @@ const advance = (selection: Selection, refresh: () => void, direction: AdvanceDi
   }
 }
 
+
+const getOptionIndex = (items: Option[], item: Option | undefined, direction: AdvanceDirection): number => {
+  if( !item ) {
+    return 0;
+  }
+  console.log(item);
+  let idx = items.findIndex(option => option.value === item.value);
+  if( idx === -1 ) {
+    return 0;
+  } 
+  if( direction === AdvanceDirection.Previous ) {
+    return idx === 0 ? -1 : idx - 1;
+  }
+  console.log(`advance = ${idx}`)
+  return idx === items.length - 1 ? -1 : idx + 1;
+}
+
+const advanceOptions = (selection: Selection, refresh: () => void, direction: AdvanceDirection) => {
+  const keys = Array.from(selection.options.keys());
+  if( selection.option ) {
+    const items = selection.options.get(selection.option);
+    console.log(items)
+    if( items ) {
+      const idx = getOptionIndex( items, selection.optionSelection, direction);
+      console.log(`idx = ${idx}`)
+      if( idx == -1 ) {
+        let grpIdx = keys.indexOf(selection.option);
+        console.log(`gidx = ${grpIdx},len ${ keys.length}`);
+        console.log(keys);
+        if( direction === AdvanceDirection.Next ) {
+          grpIdx = ( grpIdx === keys.length -1 ) ? 0 : grpIdx + 1;
+        } else {
+          grpIdx = ( grpIdx === 0 ) ? keys.length -1 : grpIdx -1;
+        }
+        console.log(`gidx = ${grpIdx}`)
+        const itemsList = selection.options.get(keys[grpIdx])
+        console.log(itemsList)
+        if( itemsList && itemsList.length > 0) {
+          selection.optionSelection = ( direction === AdvanceDirection.Next ) 
+            ? itemsList[0]
+            : itemsList[itemsList.length-1];
+          selection.option = keys[grpIdx];
+        }
+      } else {
+        selection.optionSelection = items[idx];
+      }
+      refresh();
+      return;
+    }
+  }
+  for (const [key,items] of selection.choices.entries()) {
+    if( items.length > 0 ) {
+      selection.selection = items[0];
+      selection.choice = key;
+      return;
+    }
+  }
+}
+
 const getTriggerText = (intent: Intent, text: string): string | undefined => {
   console.log(`cnt = ${intent.triggers.length}`);
   console.log(intent.triggers);
@@ -325,18 +404,20 @@ const App = () => {
   const refresh = () => setUpdate(window.performance.now());
 
   const clearSelection = () => {
-    selection.current = {
-      choices: new Map(),
-      choice: undefined,
-      selection: undefined,
-      options: new Map(),
-    };
+    selection.current.choices = new Map();
+    selection.current.choice = undefined;
+    selection.current.selection = undefined;
+    selection.current.options = new Map();
+    selection.current.optionSelection = undefined;
+    selection.current.option = undefined;
     refresh();
   }
   
   const updateOptions = (text: string) => {
     selection.current.intent?.fields.forEach( field => {
+      console.log(field);
       if( field.type.toLowerCase() === "custom" ) {
+        console.log("custom");
         if( field.valueExpresion && 
           ( field.matchPatten && text.match(field.matchPatten) ||
           field.matchExpresion && eval(`const val=\"${text}\"; ${field.matchExpresion}`) === true )) {
@@ -346,61 +427,109 @@ const App = () => {
             selection.current.options.delete(field.name);
           }
       } else {
-        
+        const choice = config.choices.find( choice => choice.key.toLowerCase() === field.type.toLowerCase());
+        console.log(choice);
+        if( choice ) {
+          let options: Option[] = [];
+          if( choice.options ) {
+            console.log("options");
+            options = choice.options?.filter( (opt: Option | string) => {
+              return (choice.ignoreCase ?? true)
+                ? ((opt as Option).display ?? (opt as Option).value).toLowerCase().startsWith(text.toLowerCase())
+                : ((opt as Option).display ?? (opt as Option).value).startsWith(text);
+              });
+            if( options.length > 0 ) {
+              selection.current.options.set(choice.key, options);
+              if( !selection.current.optionSelection ) {
+                  selection.current.option = choice.key;
+                  selection.current.optionSelection = options[0];
+                }
+            } else {
+              selection.current.options.delete(choice.key);
+              if( selection.current.option === choice.key) {
+                selection.current.option = undefined;
+                selection.current.optionSelection = undefined;
+              }
+            }
+            refresh();
+          } else if( choice.service ) {
+            console.log("service");
+            if (typeof choice.service === 'function') {
+              choice.service(text)
+                .then( options => {
+                  console.log(options);
+                  if( options.length > 0 ) {
+                    selection.current.options.set(choice.key, options);
+                    if( !selection.current.optionSelection ) {
+                      selection.current.option = choice.key;
+                      selection.current.optionSelection = options[0];
+                    }
+                  } else {
+                    selection.current.options.delete(choice.key);
+                    if( selection.current.option === choice.key) {
+                      selection.current.option = undefined;
+                      selection.current.optionSelection = undefined;
+                    }
+                  }
+                  refresh();
+                })
+                .catch(error => console.log(error));
+            }
+          }
+        }
       }
     });
   }
   
   const updateSelection = (searchText: string) => {
-    if( selection.current.intent ) {
-      //we can show only options;
-    } else {
-      console.log(`searchText: ${searchText}`);
-      getMatchingApps(searchText)
-        .then( apps => {
-          console.log(apps);
-          if( apps.length === 0 ) {
-            if( selection.current.choice === "APPS" ) {
-              selection.current.choice = undefined;
-              selection.current.selection = undefined;
-              selection.current.choices.delete("APPS");
-            }
-          } else {
-            selection.current.choices.set("APPS", apps)
-            if( !selection.current.choice ) {
-              selection.current.choice = "APPS";
-              selection.current.selection = apps[0];
-              console.log(selection.current);
-            }
-          }
-          refresh();
-        })
-        .catch( error => console.log(error));
-      config.intents.forEach( intent => {
-        const match = intent.triggers.find( trigger => {
-          return (intent.ignoreCase ?? true)
-            ? trigger.toLowerCase().indexOf(searchText.toLowerCase()) !== -1
-            : trigger.indexOf(searchText) !== -1
-        });
-        if( match ) {
-          if( !selection.current.choice ) {
-            selection.current.choices.set(intent.action, [intent])
-            selection.current.choice = intent.action;
-            selection.current.selection = intent;
-          }
-        } else {
-          selection.current.choices.delete(intent.action);
-          if( selection.current.choice === intent.action ) {
+    console.log(`searchText: ${searchText}`);
+    getMatchingApps(searchText)
+      .then( apps => {
+        console.log(apps);
+        if( apps.length === 0 ) {
+          selection.current.choices.delete("APPS");
+          if( selection.current.choice === "APPS" ) {
             selection.current.choice = undefined;
             selection.current.selection = undefined;
+            advance(selection.current, refresh, AdvanceDirection.Next);
+          }
+        } else {
+          selection.current.choices.set("APPS", apps)
+          if( !selection.current.choice ) {
+            selection.current.choice = "APPS";
+            selection.current.selection = apps[0];
+            console.log(selection.current);
           }
         }
+        refresh();
+      })
+      .catch( error => console.log(error));
+    config.intents.forEach( intent => {
+      const match = intent.triggers.find( trigger => {
+        return (intent.ignoreCase ?? true)
+          ? trigger.toLowerCase().startsWith(searchText.toLowerCase()) 
+          : trigger.startsWith(searchText) 
       });
+      if( match ) {
+        if( !selection.current.choice ) {
+          selection.current.choices.set(intent.action, [intent])
+          selection.current.choice = intent.action;
+          selection.current.selection = intent;
+        }
+      } else {
+        selection.current.choices.delete(intent.action);
+        if( selection.current.choice === intent.action ) {
+          selection.current.choice = undefined;
+          selection.current.selection = undefined;
+          advance(selection.current, refresh, AdvanceDirection.Next);
+        }
+      }
+      refresh();
+    });
 
-      config.interests.forEach( intent => {
+    config.interests.forEach( intent => {
 
-      });
-    }
+    });
   }
 
   const textChanged = (event: ChangeEvent<HTMLInputElement>) => {
@@ -434,12 +563,16 @@ const App = () => {
         case "ArrowDown":
           if( selection.current.selection ) {
             advance(selection.current, refresh, AdvanceDirection.Next);
+          } else if( selection.current.optionSelection ) {
+            advanceOptions(selection.current, refresh, AdvanceDirection.Next);
           }
           event.preventDefault();
           break;
         case "ArrowUp":
           if( selection.current.selection ) {
             advance(selection.current, refresh, AdvanceDirection.Previous);
+          } else if( selection.current.optionSelection ) {
+            advanceOptions(selection.current, refresh, AdvanceDirection.Next);
           }
           event.preventDefault();
           break;
@@ -454,8 +587,8 @@ const App = () => {
             if( "url" in active ) {
               console.log(`Launching ${active.url}`);
               launchPwa(active.url);
-              clearSelection();
               setInputText("");
+              clearSelection();
             } 
           }
           break;
@@ -466,6 +599,7 @@ const App = () => {
             if ( "action" in active ) {
               const trigger = getTriggerText(active, selection.current.text ?? "");
               console.log(trigger);
+              console.log(active)
               if( trigger ) {
                 selection.current.intent = active;
                 setInputText(trigger + " ");
@@ -502,6 +636,16 @@ const App = () => {
           />
           <div className="textMenu">
             <span className="textCopy">{inputText}</span>
+            {
+              selection.current.optionSelection && <span className="suggestionText">{getOptionText(selection.current.optionSelection, selection.current.text ?? "")}</span>
+            } 
+            {
+              hasOptions(selection.current) &&
+              <span className="iconGroup">
+                <MdOutlineKeyboardArrowUp className="iconTop"/>
+                <MdOutlineKeyboardArrowDown className="iconBottom"/>
+              </span>
+            }
             {
               selection.current.selection && <span className="suggestionText">{getSelectionText(selection.current.selection, selection.current.text ?? "")}</span>
             } 
