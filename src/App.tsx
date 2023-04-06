@@ -2,13 +2,12 @@ import { useState, KeyboardEvent, ChangeEvent, useRef } from 'react';
 import { getApps, launchPwa } from 'synergy-client';
 import { RegisteredClient } from 'synergy-client';
 import { 
-  MdOutlineKeyboardDoubleArrowUp,
-  MdOutlineKeyboardDoubleArrowDown,
   MdOutlineKeyboardArrowUp,
   MdOutlineKeyboardArrowDown
 } from "react-icons/md";
 
 import './App.css';
+import { current } from '@reduxjs/toolkit';
 
 interface Option {
   key?: string; //if missing then value
@@ -19,8 +18,9 @@ interface Option {
 interface Field {
   name: string;
   type: string; //datatype or choice key
-  matchPatten?: string; //regex pattern or javascript used to detmined if text matches
-  valueFunction?: string; //javascript run using eval
+  matchPatten?: string; //regex pattern 
+  matchExpresion?: string; //javascript used to detmined if text matches
+  valueExpresion?: string; //javascript run using eval
 }
 
 enum Case {
@@ -130,7 +130,7 @@ const config: Config = {
   ],
   intents: [
     {
-      triggers: ['BUY', 'SELL'],
+      triggers: ['BUY', 'SELL', 'Exam'],
       adjustCase: Case.Upper,
       triggerField: 'side',
       action: 'test',
@@ -182,7 +182,9 @@ interface Selection {
   choice?: string;
   selection?: RegisteredClient | Intent | Interest;
   intent?: Intent;
-  options?: Option[];
+  options: Map<string,Option[]>;
+  option?: string;
+  optionSelection?: Option;
 }
 
 
@@ -193,18 +195,15 @@ const hasSelections = (selection: Selection) => {
 }
 
 const getIntentText = (intent: Intent, text: string): string => {
-  return (intent.triggers.find( trigger =>{
+  const intentText = (intent.triggers.find( trigger =>{
     return (intent.ignoreCase ?? true) 
       ? trigger.toLowerCase().indexOf(text.toLowerCase()) !== -1
       : trigger.indexOf(text) !== -1
-  }) ?? intent.action)
-    .replace(
-      intent.adjustCase === Case.Lower
-        ? text.toLowerCase()
-        : intent.adjustCase === Case.Upper
-          ? text.toUpperCase()
-          : text, ""
-    );
+  }) ?? intent.action);
+
+  const idx = intentText.toLowerCase().indexOf(text.toLowerCase());
+  const removeText = intentText.slice(idx,text.length);
+  return intentText.replace(removeText,"");
 }
 
 const getSelectionText = (selection: RegisteredClient | Intent | Interest, text: string): string => {
@@ -215,35 +214,101 @@ const getSelectionText = (selection: RegisteredClient | Intent | Interest, text:
       : selection.topic.replace(text,"");
 }
 
-const getIndex = <T extends object> (items: T[], item: T | undefined, direction: AdvanceDirection): number => {
+const getIdx = <T extends RegisteredClient | Intent | Interest> (
+  items: T[], 
+  item: T 
+): number => {
+  for (let index = 0; index < items.length; index++) {
+    const element = items[index];
+    if( "url" in item && "url" in element) {
+      if( item.url === element.url) {
+        return index;
+      }
+    }
+    if( "action" in item && "action" in element) {
+      if( item.action === element.action &&
+        item.donmain === element.donmain &&
+        item.subDomain === element.subDomain) {
+        return index;
+      }
+    }
+    if( "topic" in item && "topic" in element) {
+      if( item.topic === element.topic &&
+        item.donmain === element.donmain &&
+        item.subDomain === element.subDomain) {
+        return index;
+      }
+    }
+  }
+  return -1;
+}
+
+const getIndex = <T extends RegisteredClient | Intent | Interest> (items: T[], item: T | undefined, direction: AdvanceDirection): number => {
   if( !item ) {
     return 0;
   }
-  let idx = items.indexOf(item);
+  console.log(item);
+  let idx = getIdx(items, item);
   if( idx === -1 ) {
     return 0;
   } 
   if( direction === AdvanceDirection.Previous ) {
-    return idx === 0 ? items.length -1 : idx-1;
+    return idx === 0 ? -1 : idx - 1;
   }
-  return idx === items.length -1 ? 0 : idx+1;
+  console.log(`advance = ${idx}`)
+  return idx === items.length - 1 ? -1 : idx + 1;
 }
 
 const advance = (selection: Selection, refresh: () => void, direction: AdvanceDirection) => {
-  if( selection.choice && selection.choices.has(selection.choice) ) {
+  const keys = Array.from(selection.choices.keys());
+  if( selection.choice ) {
     const items = selection.choices.get(selection.choice);
+    console.log(items)
     if( items ) {
       const idx = getIndex( items, selection.selection, direction);
-      selection.selection = items[idx];
+      console.log(`idx = ${idx}`)
+      if( idx == -1 ) {
+        let grpIdx = keys.indexOf(selection.choice);
+        console.log(`gidx = ${grpIdx},len ${ keys.length}`);
+        console.log(keys);
+        if( direction === AdvanceDirection.Next ) {
+          grpIdx = ( grpIdx === keys.length -1 ) ? 0 : grpIdx + 1;
+        } else {
+          grpIdx = ( grpIdx === 0 ) ? keys.length -1 : grpIdx -1;
+        }
+        console.log(`gidx = ${grpIdx}`)
+        const itemsList = selection.choices.get(keys[grpIdx])
+        console.log(itemsList)
+        if( itemsList && itemsList.length > 0) {
+          selection.selection = ( direction === AdvanceDirection.Next ) 
+            ? itemsList[0]
+            : itemsList[itemsList.length-1];
+          selection.choice = keys[grpIdx];
+        }
+      } else {
+        selection.selection = items[idx];
+      }
       refresh();
+      return;
+    }
+  }
+  for (const [key,items] of selection.choices.entries()) {
+    if( items.length > 0 ) {
+      selection.selection = items[0];
+      selection.choice = key;
+      return;
     }
   }
 }
 
-const processSelection = (selection: RegisteredClient | Intent | Interest) => {
-  if( "url" in selection ) {
-    console.log(`Launching ${selection.url}`);
-    launchPwa(selection.url);
+const getTriggerText = (intent: Intent, text: string): string | undefined => {
+  console.log(`cnt = ${intent.triggers.length}`);
+  console.log(intent.triggers);
+  for (let index = 0; index < intent.triggers.length; index++) {
+    console.log(intent.triggers[index])
+    if( intent.triggers[index].toLowerCase().indexOf(text.toLowerCase()) !== -1 ) {
+      return intent.triggers[index];
+    }
   }
 }
 
@@ -251,7 +316,8 @@ const App = () => {
   const [inputText,setInputText] = useState<string>("");
   const selection = useRef<Selection>( 
     {
-      choices: new Map()
+      choices: new Map(),
+      options: new Map()
     }
   );
   const [update,setUpdate] = useState<number>();
@@ -263,10 +329,26 @@ const App = () => {
       choices: new Map(),
       choice: undefined,
       selection: undefined,
-      intent: undefined,
-      options: undefined
+      options: new Map(),
     };
     refresh();
+  }
+  
+  const updateOptions = (text: string) => {
+    selection.current.intent?.fields.forEach( field => {
+      if( field.type.toLowerCase() === "custom" ) {
+        if( field.valueExpresion && 
+          ( field.matchPatten && text.match(field.matchPatten) ||
+          field.matchExpresion && eval(`const val=\"${text}\"; ${field.matchExpresion}`) === true )) {
+            const value = eval(`const val=\"${text}\"; ${field.valueExpresion}`);
+            selection.current.options.set(field.name, value);
+          } else {
+            selection.current.options.delete(field.name);
+          }
+      } else {
+        
+      }
+    });
   }
   
   const updateSelection = (searchText: string) => {
@@ -280,12 +362,13 @@ const App = () => {
           if( apps.length === 0 ) {
             if( selection.current.choice === "APPS" ) {
               selection.current.choice = undefined;
+              selection.current.selection = undefined;
               selection.current.choices.delete("APPS");
             }
           } else {
+            selection.current.choices.set("APPS", apps)
             if( !selection.current.choice ) {
               selection.current.choice = "APPS";
-              selection.current.choices.set("APPS", apps)
               selection.current.selection = apps[0];
               console.log(selection.current);
             }
@@ -301,17 +384,17 @@ const App = () => {
         });
         if( match ) {
           if( !selection.current.choice ) {
-            selection.current.choice = intent.action;
             selection.current.choices.set(intent.action, [intent])
+            selection.current.choice = intent.action;
             selection.current.selection = intent;
           }
         } else {
+          selection.current.choices.delete(intent.action);
           if( selection.current.choice === intent.action ) {
             selection.current.choice = undefined;
-            selection.current.choices.delete(intent.action);
+            selection.current.selection = undefined;
           }
         }
-
       });
 
       config.interests.forEach( intent => {
@@ -325,12 +408,19 @@ const App = () => {
       const end = event.target.selectionStart ?? 0;
       let start = end;
       while( start > 0 && (event.target.value.charAt(start) !== ' ')) start--; 
-      const word = event.target.value.substring(start);
+      const word = event.target.value.substring(start).trim();
       selection.current.text = word;
-      if( word.length > 0) {
-        updateSelection(word);
+      if( word.length > 0 ) {
+        if( selection.current.intent ) {
+          updateOptions(word);
+        } else {
+          updateSelection(word);
+        }
       } else {
         clearSelection();
+        if( event.target.value.length === 0 ) {
+          selection.current.intent = undefined;
+        } 
       }
       setInputText(event.target.value);
     } catch(error) {
@@ -345,11 +435,13 @@ const App = () => {
           if( selection.current.selection ) {
             advance(selection.current, refresh, AdvanceDirection.Next);
           }
+          event.preventDefault();
           break;
         case "ArrowUp":
           if( selection.current.selection ) {
             advance(selection.current, refresh, AdvanceDirection.Previous);
           }
+          event.preventDefault();
           break;
         case "Home":
           break;
@@ -358,12 +450,31 @@ const App = () => {
         case "NumpadEnter":
         case "Enter":
           if( selection.current.selection ) {
-            processSelection(selection.current.selection);
-            clearSelection();
-            setInputText("");
+            const active = selection.current.selection;
+            if( "url" in active ) {
+              console.log(`Launching ${active.url}`);
+              launchPwa(active.url);
+              clearSelection();
+              setInputText("");
+            } 
           }
           break;
 
+        case "Tab":
+          if( selection.current.selection ) {
+            const active = selection.current.selection;
+            if ( "action" in active ) {
+              const trigger = getTriggerText(active, selection.current.text ?? "");
+              console.log(trigger);
+              if( trigger ) {
+                selection.current.intent = active;
+                setInputText(trigger + " ");
+                clearSelection();
+              }
+            }
+          }
+          event.preventDefault();
+          break;
       }
     } catch(error) {
       console.log(error);
@@ -402,13 +513,13 @@ const App = () => {
               </span>
             }
             {
-              selection.current.choice && <span className="suggestionText">{selection.current.choice}:</span>
+              selection.current.choice && <span className="suggestionText">{selection.current.choice}</span>
             }
             {
               (selection.current.choices.size > 1) &&
               <span className="iconGroup">
-                <MdOutlineKeyboardDoubleArrowUp className="iconTop"/>
-                <MdOutlineKeyboardDoubleArrowDown className="iconBottom"/>
+                <MdOutlineKeyboardArrowUp className="iconTop"/>
+                <MdOutlineKeyboardArrowDown className="iconBottom"/>
               </span>
             }
           </div>  
