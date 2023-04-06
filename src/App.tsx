@@ -7,7 +7,6 @@ import {
 } from "react-icons/md";
 
 import './App.css';
-import { current } from '@reduxjs/toolkit';
 
 interface Option {
   display?: string; //if missing then value
@@ -184,6 +183,11 @@ enum AdvanceDirection {
   Previous
 }
 
+interface Prop {
+  name: string;
+  value: string;
+}
+
 interface Selection {
   text?: string;
   choices: Map<string,Intent[] | RegisteredClient[] | Interest[]>;
@@ -193,6 +197,7 @@ interface Selection {
   options: Map<string,Option[]>;
   option?: string;
   optionSelection?: Option;
+  props: Map<string,string>;
 }
 
 
@@ -396,7 +401,8 @@ const App = () => {
   const selection = useRef<Selection>( 
     {
       choices: new Map(),
-      options: new Map()
+      options: new Map(),
+      props: new Map()
     }
   );
   const [update,setUpdate] = useState<number>();
@@ -549,6 +555,7 @@ const App = () => {
         clearSelection();
         if( event.target.value.length === 0 ) {
           selection.current.intent = undefined;
+          selection.current.props = new Map();
         } 
       }
       setInputText(event.target.value);
@@ -606,6 +613,11 @@ const App = () => {
                 clearSelection();
               }
             }
+          } else if( selection.current.option && selection.current.optionSelection ) {
+            selection.current.props.set(selection.current.option, selection.current.optionSelection.value)
+            const text = inputText.substring(0,inputText.lastIndexOf(" ") + 1);
+            setInputText(text + selection.current.optionSelection.value + " ");
+            clearSelection();
           }
           event.preventDefault();
           break;
