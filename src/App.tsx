@@ -1,5 +1,5 @@
-import { useState, KeyboardEvent, ChangeEvent, useRef, useDebugValue } from 'react';
-import { getApps, launchPwa } from 'synergy-client';
+import { useState, KeyboardEvent, ChangeEvent, useRef } from 'react';
+import { getApps, launchPwa, raiseIntent } from 'synergy-client';
 import { RegisteredClient } from 'synergy-client';
 import { 
   MdOutlineKeyboardArrowUp,
@@ -167,25 +167,9 @@ const getMatchingApps = async (filter: string): Promise<RegisteredClient[]> => {
   });
 }
 
-interface IntentSelection {
-  intent: Intent
-  text: string;
-  payload: any;
-}
-
-interface InterestSelection {
-  interest: Interest
-  text: string;
-}
-
 enum AdvanceDirection {
   Next,
   Previous
-}
-
-interface Prop {
-  name: string;
-  value: string;
 }
 
 interface Selection {
@@ -204,13 +188,13 @@ interface Selection {
 const hasSelections = (selection: Selection) => {
   return selection.choice && 
     selection.choices.has(selection.choice) && 
-    (selection.choices.get(selection.choice!)?.length ?? 0) > 0;
+    (selection.choices.get(selection.choice!)?.length ?? 0) > 1;
 }
 
 const hasOptions = (selection: Selection) => {
   return selection.option && 
     selection.options.has(selection.option) && 
-    (selection.options.get(selection.option!)?.length ?? 0) > 0;
+    (selection.options.get(selection.option!)?.length ?? 0) > 1;
 } 
 
 const getIntentText = (intent: Intent, text: string): string => {
@@ -292,7 +276,7 @@ const advance = (selection: Selection, refresh: () => void, direction: AdvanceDi
     if( items ) {
       const idx = getIndex( items, selection.selection, direction);
       console.log(`idx = ${idx}`)
-      if( idx == -1 ) {
+      if( idx === -1 ) {
         let grpIdx = keys.indexOf(selection.choice);
         console.log(`gidx = ${grpIdx},len ${ keys.length}`);
         console.log(keys);
@@ -351,7 +335,7 @@ const advanceOptions = (selection: Selection, refresh: () => void, direction: Ad
     if( items ) {
       const idx = getOptionIndex( items, selection.optionSelection, direction);
       console.log(`idx = ${idx}`)
-      if( idx == -1 ) {
+      if( idx === -1 ) {
         let grpIdx = keys.indexOf(selection.option);
         console.log(`gidx = ${grpIdx},len ${ keys.length}`);
         console.log(keys);
@@ -405,7 +389,7 @@ const App = () => {
       props: new Map()
     }
   );
-  const [update,setUpdate] = useState<number>();
+  const [,setUpdate] = useState<number>();
 
   const refresh = () => setUpdate(window.performance.now());
 
@@ -425,9 +409,9 @@ const App = () => {
       if( field.type.toLowerCase() === "custom" ) {
         console.log("custom");
         if( field.valueExpresion && 
-          ( field.matchPatten && text.match(field.matchPatten) ||
-          field.matchExpresion && eval(`const val=\"${text}\"; ${field.matchExpresion}`) === true )) {
-            const value = eval(`const val=\"${text}\"; ${field.valueExpresion}`);
+          ( (field.matchPatten && text.match(field.matchPatten)) ||
+          (field.matchExpresion && eval(`const val="${text}"; ${field.matchExpresion}`) === true) )) {
+            const value = eval(`const val="${text}"; ${field.valueExpresion}`);
             selection.current.options.set(field.name, value);
           } else {
             selection.current.options.delete(field.name);
@@ -575,6 +559,7 @@ const App = () => {
           }
           event.preventDefault();
           break;
+
         case "ArrowUp":
           if( selection.current.selection ) {
             advance(selection.current, refresh, AdvanceDirection.Previous);
@@ -583,12 +568,16 @@ const App = () => {
           }
           event.preventDefault();
           break;
+
         case "Home":
           break;
+
         case "End":
           break;
+
         case "NumpadEnter":
         case "Enter":
+          console.log("enter");
           if( selection.current.selection ) {
             const active = selection.current.selection;
             if( "url" in active ) {
@@ -597,6 +586,36 @@ const App = () => {
               setInputText("");
               clearSelection();
             } 
+          } else if( selection.current.intent ) {
+            console.log("has intent");
+            const payload: any = {}
+            const elements = inputText.split(" ");
+            let haveIntent = false;
+            elements.forEach( element => {
+              console.log(element);
+              if( !haveIntent && selection.current.intent?.triggers.find( trigger => trigger.toLowerCase() === element.toLowerCase()) ) {
+                haveIntent = true;
+                if(selection.current.intent.triggerField) {
+                  payload[selection.current.intent.triggerField] = element;
+                }
+              } else {
+                const prop = selection.current.props.get(element);
+                if( prop ) {
+                  payload[prop] = element;
+                }
+              }
+            });
+            console.log(payload);
+            raiseIntent(
+              selection.current.intent.action,
+              selection.current.intent.donmain,
+              selection.current.intent.subDomain,
+              payload
+            );
+            selection.current.intent = undefined;
+            selection.current.props = new Map();
+            clearSelection();
+            setInputText("");
           }
           break;
 
@@ -614,7 +633,8 @@ const App = () => {
               }
             }
           } else if( selection.current.option && selection.current.optionSelection ) {
-            selection.current.props.set(selection.current.option, selection.current.optionSelection.value)
+            console.log(`prop: ${selection.current.option}, ${selection.current.optionSelection.value} `);
+            selection.current.props.set(selection.current.optionSelection.value, selection.current.option);
             const text = inputText.substring(0,inputText.lastIndexOf(" ") + 1);
             setInputText(text + selection.current.optionSelection.value + " ");
             clearSelection();
@@ -669,7 +689,7 @@ const App = () => {
               </span>
             }
             {
-              selection.current.choice && <span className="suggestionText">{selection.current.choice}</span>
+              selection.current.choice && <span className="suggestionText">-{selection.current.choice}</span>
             }
             {
               (selection.current.choices.size > 1) &&

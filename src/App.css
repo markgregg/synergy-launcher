@@ -40,7 +40,8 @@
 
 .textCopy {
   visibility: hidden;
-  margin-right: 2px;
+  margin-right: -2px;
+  white-space: pre;
 }
 
 .iconGroup {
