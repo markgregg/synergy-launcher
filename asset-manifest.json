@@ -1,16 +1,16 @@
 {
   "files": {
-    "main.css": "/pwatst/static/css/main.12a79381.css",
-    "main.js": "/pwatst/static/js/main.00d32809.js",
-    "static/js/787.fe6e5d4e.chunk.js": "/pwatst/static/js/787.fe6e5d4e.chunk.js",
-    "service-worker.js": "/pwatst/service-worker.js",
-    "index.html": "/pwatst/index.html",
-    "main.12a79381.css.map": "/pwatst/static/css/main.12a79381.css.map",
-    "main.00d32809.js.map": "/pwatst/static/js/main.00d32809.js.map",
-    "787.fe6e5d4e.chunk.js.map": "/pwatst/static/js/787.fe6e5d4e.chunk.js.map"
+    "main.css": "/synergy-launcher/static/css/main.12a79381.css",
+    "main.js": "/synergy-launcher/static/js/main.2c09befe.js",
+    "static/js/787.fe6e5d4e.chunk.js": "/synergy-launcher/static/js/787.fe6e5d4e.chunk.js",
+    "service-worker.js": "/synergy-launcher/service-worker.js",
+    "index.html": "/synergy-launcher/index.html",
+    "main.12a79381.css.map": "/synergy-launcher/static/css/main.12a79381.css.map",
+    "main.2c09befe.js.map": "/synergy-launcher/static/js/main.2c09befe.js.map",
+    "787.fe6e5d4e.chunk.js.map": "/synergy-launcher/static/js/787.fe6e5d4e.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.12a79381.css",
-    "static/js/main.00d32809.js"
+    "static/js/main.2c09befe.js"
   ]
 }
