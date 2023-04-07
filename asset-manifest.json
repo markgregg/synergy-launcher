@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "/pwatst/static/css/main.12a79381.css",
+    "main.js": "/pwatst/static/js/main.00d32809.js",
+    "static/js/787.fe6e5d4e.chunk.js": "/pwatst/static/js/787.fe6e5d4e.chunk.js",
+    "service-worker.js": "/pwatst/service-worker.js",
+    "index.html": "/pwatst/index.html",
+    "main.12a79381.css.map": "/pwatst/static/css/main.12a79381.css.map",
+    "main.00d32809.js.map": "/pwatst/static/js/main.00d32809.js.map",
+    "787.fe6e5d4e.chunk.js.map": "/pwatst/static/js/787.fe6e5d4e.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.12a79381.css",
+    "static/js/main.00d32809.js"
+  ]
+}
