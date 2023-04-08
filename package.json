@@ -1,7 +1,7 @@
 {
   "name": "synergy-launcher",
-  "version": "0.2.0",
-  "homepage": "https://markgregg.github.io/pwatst",
+  "version": "1.0.0",
+  "homepage": "https://markgregg.github.io/synergy-launcher",
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.3",
     "@types/node": "^17.0.45",
