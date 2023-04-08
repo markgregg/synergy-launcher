@@ -25,4 +25,4 @@ serviceWorkerRegistration.register();
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
-limitWindowSize(635,100);
+limitWindowSize(635,140);
