@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "/synergy-launcher/static/css/main.12a79381.css",
-    "main.js": "/synergy-launcher/static/js/main.2c09befe.js",
+    "main.js": "/synergy-launcher/static/js/main.8633d6ea.js",
     "static/js/787.fe6e5d4e.chunk.js": "/synergy-launcher/static/js/787.fe6e5d4e.chunk.js",
     "service-worker.js": "/synergy-launcher/service-worker.js",
     "index.html": "/synergy-launcher/index.html",
     "main.12a79381.css.map": "/synergy-launcher/static/css/main.12a79381.css.map",
-    "main.2c09befe.js.map": "/synergy-launcher/static/js/main.2c09befe.js.map",
+    "main.8633d6ea.js.map": "/synergy-launcher/static/js/main.8633d6ea.js.map",
     "787.fe6e5d4e.chunk.js.map": "/synergy-launcher/static/js/787.fe6e5d4e.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.12a79381.css",
-    "static/js/main.2c09befe.js"
+    "static/js/main.8633d6ea.js"
   ]
 }
