@@ -1,12 +1,12 @@
 import { useState, KeyboardEvent, ChangeEvent, useRef } from 'react';
-import { getApps, launchPwa, notifyInterest, raiseIntent } from 'synergy-client';
-import { RegisteredClient } from 'synergy-client';
 import { 
   MdOutlineKeyboardArrowUp,
   MdOutlineKeyboardArrowDown
 } from "react-icons/md";
 
 import './App.css';
+import { getApps, launchPwa, notifyInterest, raiseIntent } from 'synergy-client';
+import { Pwa } from "synergy-client";
 
 interface Option {
   display?: string; //if missing then value
@@ -174,7 +174,7 @@ const config: Config = {
   ]
 }
 
-const getMatchingApps = async (filter: string): Promise<RegisteredClient[]> => {
+const getMatchingApps = async (filter: string): Promise<Pwa[]> => {
   return new Promise( (resolve,reject) => {
     try {
       getApps(filter)
@@ -194,9 +194,9 @@ enum AdvanceDirection {
 interface Selection {
   completeText: string;
   text?: string;
-  choices: Map<string,IntentOption[] | RegisteredClient[] | InterestOption[]>;
+  choices: Map<string,IntentOption[] | Pwa[] | InterestOption[]>;
   choice?: string;
-  selection?: RegisteredClient | IntentOption | InterestOption;
+  selection?: Pwa | IntentOption | InterestOption;
   intent?: Intent;
   interest?: InterestOption;
   options: Map<string,Option[]>;
@@ -230,9 +230,9 @@ const getInterestText = (interest: InterestOption, text: string): string => {
   return interest.text.replace(removeText,"");
 }
 
-const getSelectionText = (selection: RegisteredClient | IntentOption | InterestOption, text: string): string => {
+const getSelectionText = (selection: Pwa | IntentOption | InterestOption, text: string): string => {
   return "url" in selection
-    ? (selection.name ?? selection.url).replace(text,"")
+    ? (selection.title ?? selection.url).replace(text,"")
     : "action" in selection
       ? getIntentText(selection, text)
       : getInterestText(selection, text)
@@ -244,7 +244,7 @@ const getOptionText  = (option: Option, text: string): string => {
   return (option.display ?? option.value).replace(removeText,"");
 }
 
-const getIdx = <T extends RegisteredClient | IntentOption | InterestOption> (
+const getIdx = <T extends Pwa | IntentOption | InterestOption> (
   items: T[], 
   item: T 
 ): number => {
@@ -275,7 +275,7 @@ const getIdx = <T extends RegisteredClient | IntentOption | InterestOption> (
   return -1;
 }
 
-const getIndex = <T extends RegisteredClient | IntentOption | InterestOption> (items: T[], item: T | undefined, direction: AdvanceDirection): number => {
+const getIndex = <T extends Pwa | IntentOption | InterestOption> (items: T[], item: T | undefined, direction: AdvanceDirection): number => {
   if( !item ) {
     return 0;
   }
@@ -490,7 +490,7 @@ const App = () => {
     }
   }
 
-  const launchApp = (app: RegisteredClient ) => {
+  const launchApp = (app: Pwa ) => {
     console.log(`Launching ${app.url}`);
     launchPwa(app.url);
     updateInputText("");
@@ -787,7 +787,7 @@ const App = () => {
   return (
     <div className="launcher">
       <div className="titleBar">
-        <div className="titleText">Synergy</div>
+        <div className="titleText">Synergy Launch Bar</div>
       </div>
       <div className="searchContainer">
         <div className='innerContainer'>

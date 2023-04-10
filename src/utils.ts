@@ -2,12 +2,11 @@ const isStandAlone = () => {
   return window.matchMedia('(display-mode: standalone)').matches
 }
 
-
-export const limitWindowSize = (width: number, height: number) => {
+export const limitWindowHeight = (height: number) => {
   if (isStandAlone()) {
-    window.resizeTo(width, height) 
+    window.resizeTo(window.outerWidth, height);
     window.addEventListener('resize', () => {
-      window.resizeTo(width, height)
+      window.resizeTo(window.outerWidth, height);
     })
   }
 }
