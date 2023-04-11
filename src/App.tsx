@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent, ChangeEvent, useRef } from 'react';
+import { useState, KeyboardEvent, ChangeEvent, useRef, useEffect } from 'react';
 import { 
   MdOutlineKeyboardArrowUp,
   MdOutlineKeyboardArrowDown
@@ -6,173 +6,26 @@ import {
 
 import './App.css';
 import { getApps, launchPwa, notifyInterest, raiseIntent } from 'synergy-client';
-import { Pwa } from "synergy-client";
+import { Pwa, Intent, Option, LaunchConfig } from "synergy-client";
+import IntentOption from './types/IntentOption';
+import InterestOption from './types/InterestOption';
+import { getLaunchConfig } from 'synergy-client/lib/esm/client';
 
-interface Option {
-  display?: string; //if missing then value
-  value: string;
-  body?: string;
-}
 
-interface Field {
-  name: string;
-  type: string; //datatype or choice key
-  matchPatten?: string; //regex pattern 
-  matchExpresion?: string; //javascript used to detmined if text matches
-  valueExpresion?: string; //javascript run using eval
-}
-
-enum Case {
-  Lower,
-  Upper
-}
-
-interface Intent {
-  triggers: string[]; //if matches a field then value is used in field
-  triggerField?: string;
-  ignoreCase?: boolean; //defaults to true
-  adjustCase?: Case;
-  domain?: string;
-  subDomain?: string;
-  action: string;
-  fields: Field[]; //buy,sell,price,
-}
-
-interface IntentOption {
-  domain?: string;
-  subDomain?: string;
-  action: string;
-  text: string;  
-}
-
-interface Interest {
-  domain?: string;
-  subDomain?: string;
-  topic: string;
-  body?: string; //choice
-  service?: Service | FunctionCall;
-}
-
-interface InterestOption {
-  domain?: string;
-  subDomain?: string;
-  topic: string;
-  text: string;
-  body: any;
-}
-
-type FunctionCall = (param: string) => Promise<Option[]>;
-
-interface Service {
-  endPoint: string;
-  parameter: string;
-}
-
-interface Choice {
-  key: string;
-  ignoreCase?: boolean; //defaults to true
-  options?: Option[];
-  service?: Service | FunctionCall;
-}
-
-interface Config {
-  choices: Choice[];
-  interests: Interest[];
-  intents: Intent[];
-}
-
-const currencyPairs = [
-  {value: 'USD/GBP'},
-  {value: 'GBP/EUR'},
-  {value: 'EUR/USD'},
-  {value: 'GBP/JPY'},
-  {value: 'USD/JPY'},
-  {value: 'GBP/AUD'},
-  {value: 'GBP/BRL'},
-  {value: 'GBP/CAD'},
-  {value: 'GBP/CHF'},
-  {value: 'GBP/CNY'},
-  {value: 'GBP/INR'},
-  {value: 'GBP/NOK'},
-  {value: 'GBP/QAR'},
-  {value: 'GBP/ZAR'},
-  {value: 'EUR/CHF'},
-  {value: 'EUR/CAD'},
-  {value: 'EUR/JPY'},
-  {value: 'EUR/SEK'},
-  {value: 'EUR/HUF'},
-  {value: 'USD/CAD'},
-  {value: 'USD/HKD'},
-  {value: 'USD/SGD'},
-  {value: 'USD/INR'},
-  {value: 'USD/MXN'},
-  {value: 'USD/CNY'},
-  {value: 'USD/CHF'}
-  ];
-
-const getCcyPair = (param: string): Promise<Option[]> => {
+/*const getCcyPair = (param: string): Promise<Option[]> => {
   console.log(param);
   return new Promise( (resolve,reject) => {
     resolve(currencyPairs.filter( ccyPair => ccyPair.value.toLowerCase().startsWith(param.toLowerCase())));
   });
 }
 
-const brokers = [
-  {value: "LHAM"}, 
-  {value: "CHASE"}, 
-  {value: "BARC"}, 
-  {value: "POLIC"}, 
-  {value: "SANT"}, 
-  {value: "REND"}
-];
-
 const getBroker = (param: string): Promise<Option[]> => {
   console.log(param);
   return new Promise( (resolve,reject) => {
     resolve(brokers.filter( broker => broker.value.toLowerCase().startsWith(param.toLowerCase())));
   });
-}
+}*/
 
-const config: Config = {
-  choices: [
-    {
-      key: 'side',
-      options: [{value: 'BUY'}, {value: 'SELL'}]
-    },
-    {
-      key: 'pair',
-      service: getCcyPair
-    },
-    {
-      key: 'broker',
-      service: getBroker
-    }
-  ],
-  interests: [
-    {
-      topic: 'ccyPair',
-      service: getCcyPair
-    }
-  ],
-  intents: [
-    {
-      triggers: ['BUY', 'SELL', 'Exam'],
-      adjustCase: Case.Upper,
-      triggerField: 'side',
-      action: 'test',
-      fields: [
-        {
-          name: 'pair',
-          type: 'pair'
-        },
-        {
-          name: 'broker',
-          type: 'broker'
-        }
-      ]
-    }
-  ]
-}
 
 const getMatchingApps = async (filter: string): Promise<Pwa[]> => {
   return new Promise( (resolve,reject) => {
@@ -419,6 +272,13 @@ const advanceOptions = (selection: Selection, refresh: () => void, direction: Ad
 }
 
 const App = () => {
+  const [config,setConfig] = useState<LaunchConfig>({
+    pwas: [],
+    lists: new Map(),
+    choices: [],
+    interests: [],
+    intents: []
+  });
   const [inputText,setInputText] = useState<string>("");
   const selection = useRef<Selection>( 
     {
@@ -429,8 +289,14 @@ const App = () => {
     }
   );
   const [,setUpdate] = useState<number>();
-
   const refresh = () => setUpdate(window.performance.now());
+
+  useEffect(() => {
+    getLaunchConfig()
+      .then(setConfig)
+      .catch(error => console.log(error));
+  },[])
+
   const updateInputText = (text: string) => {
     selection.current.completeText = text;
     setInputText(text);
@@ -561,13 +427,13 @@ const App = () => {
         console.log(choice);
         if( choice ) {
           let options: Option[] = [];
-          if( choice.options ) {
+          if( choice.list && config.lists.has(choice.list) ) {
             console.log("options");
-            options = choice.options?.filter( (opt: Option | string) => {
+            options = config.lists.get(choice.list)?.filter( (opt: Option | string) => {
               return (choice.ignoreCase ?? true)
                 ? ((opt as Option).display ?? (opt as Option).value).toLowerCase().startsWith(text.toLowerCase())
                 : ((opt as Option).display ?? (opt as Option).value).startsWith(text);
-              });
+              }) ?? [];
             if( options.length > 0 ) {
               selection.current.options.set(choice.key, options);
               if( !selection.current.optionSelection ) {
@@ -582,30 +448,7 @@ const App = () => {
               }
             }
             refresh();
-          } else if( choice.service ) {
-            console.log("service");
-            if (typeof choice.service === 'function') {
-              choice.service(text)
-                .then( options => {
-                  console.log(options);
-                  if( options.length > 0 ) {
-                    selection.current.options.set(choice.key, options);
-                    if( !selection.current.optionSelection ) {
-                      selection.current.option = choice.key;
-                      selection.current.optionSelection = options[0];
-                    }
-                  } else {
-                    selection.current.options.delete(choice.key);
-                    if( selection.current.option === choice.key) {
-                      selection.current.option = undefined;
-                      selection.current.optionSelection = undefined;
-                    }
-                  }
-                  refresh();
-                })
-                .catch(error => console.log(error));
-            }
-          }
+          } 
         }
       }
     });
@@ -667,37 +510,36 @@ const App = () => {
     });
 
     config.interests.forEach( interest => {
-      if (typeof interest.service === 'function') {
-        interest.service(searchText)
-          .then( interests => {
-            const intrestOptions: InterestOption[] = interests.map( value => {
-              return {
-                topic: interest.topic,
-                domain: interest.domain,
-                subDomain: interest.subDomain,
-                text: value.value,
-                body: value.body
-              }
-            });
-            if( interests.length > 0 ) {
-              console.log(intrestOptions);
-              selection.current.choices.set(interest.topic, intrestOptions)
-              if( !selection.current.choice || 
-                selection.current.choice === interest.topic ) {
-                selection.current.choice = interest.topic;
-                selection.current.selection = intrestOptions[0];
-              }
-            } else {
-              selection.current.choices.delete(interest.topic);
-              if( selection.current.choice === interest.topic ) {
-                selection.current.choice = undefined;
-                selection.current.selection = undefined;
-                advance(selection.current, refresh, AdvanceDirection.Next);
-              }
+      if (interest.list && config.lists.has(interest.list) ) {
+        const options = config.lists.get(interest.list)?.filter( (opt: Option | string) => {
+          return ((opt as Option).display ?? (opt as Option).value).toLowerCase().startsWith(searchText.toLowerCase());
+          });
+        if( options && options.length > 0 ) {
+          const intrestOptions: InterestOption[] = options.map( value => {
+            return {
+              topic: interest.topic,
+              domain: interest.domain,
+              subDomain: interest.subDomain,
+              text: value.value,
+              body: value.body
             }
-            refresh();
-          })
-          .catch(error => console.log(error));
+          });
+          console.log(intrestOptions);
+            selection.current.choices.set(interest.topic, intrestOptions)
+            if( !selection.current.choice || 
+              selection.current.choice === interest.topic ) {
+              selection.current.choice = interest.topic;
+              selection.current.selection = intrestOptions[0];
+            }
+        } else {
+          selection.current.choices.delete(interest.topic);
+            if( selection.current.choice === interest.topic ) {
+              selection.current.choice = undefined;
+              selection.current.selection = undefined;
+              advance(selection.current, refresh, AdvanceDirection.Next);
+            }
+        }
+        refresh();
       }
     });
   }
