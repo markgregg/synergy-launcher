@@ -5,39 +5,11 @@ import {
 } from "react-icons/md";
 
 import './App.css';
-import { getApps, launchPwa, notifyInterest, raiseIntent } from 'synergy-client';
+import { getLaunchConfig, launchPwa, notifyInterest, raiseIntent } from 'synergy-client';
 import { Pwa, Intent, Option, LaunchConfig } from "synergy-client";
 import IntentOption from './types/IntentOption';
 import InterestOption from './types/InterestOption';
-import { getLaunchConfig } from 'synergy-client/lib/esm/client';
 
-
-/*const getCcyPair = (param: string): Promise<Option[]> => {
-  console.log(param);
-  return new Promise( (resolve,reject) => {
-    resolve(currencyPairs.filter( ccyPair => ccyPair.value.toLowerCase().startsWith(param.toLowerCase())));
-  });
-}
-
-const getBroker = (param: string): Promise<Option[]> => {
-  console.log(param);
-  return new Promise( (resolve,reject) => {
-    resolve(brokers.filter( broker => broker.value.toLowerCase().startsWith(param.toLowerCase())));
-  });
-}*/
-
-
-const getMatchingApps = async (filter: string): Promise<Pwa[]> => {
-  return new Promise( (resolve,reject) => {
-    try {
-      getApps(filter)
-        .then( apps =>  resolve(apps))
-        .catch(error =>  reject(error));
-    } catch(error) {
-      reject(error);
-    }
-  });
-}
 
 enum AdvanceDirection {
   Next,
@@ -293,7 +265,11 @@ const App = () => {
 
   useEffect(() => {
     getLaunchConfig()
-      .then(setConfig)
+      .then( config => {
+        console.log(config);
+        console.log(config.lists.has("brokers"))
+        setConfig(config);
+      })
       .catch(error => console.log(error));
   },[])
 
@@ -456,28 +432,25 @@ const App = () => {
   
   const updateSelection = (searchText: string) => {
     console.log(`searchText: ${searchText}`);
-    getMatchingApps(searchText)
-      .then( apps => {
-        console.log(apps);
-        if( apps.length === 0 ) {
-          selection.current.choices.delete("APPS");
-          if( selection.current.choice === "APPS" ) {
-            selection.current.choice = undefined;
-            selection.current.selection = undefined;
-            advance(selection.current, refresh, AdvanceDirection.Next);
-          }
-        } else {
-          selection.current.choices.set("APPS", apps)
-          if( !selection.current.choice ||
-            selection.current.choice === "APPS" ) {
-            selection.current.choice = "APPS";
-            selection.current.selection = apps[0];
-            console.log(selection.current);
-          }
-        }
-        refresh();
-      })
-      .catch( error => console.log(error));
+    const apps = config.pwas.filter( pwa => pwa.title.toLowerCase().startsWith(searchText.toLowerCase()));
+    console.log(apps);
+    if( apps.length === 0 ) {
+      selection.current.choices.delete("APPS");
+      if( selection.current.choice === "APPS" ) {
+        selection.current.choice = undefined;
+        selection.current.selection = undefined;
+        advance(selection.current, refresh, AdvanceDirection.Next);
+      }
+    } else {
+      selection.current.choices.set("APPS", apps)
+      if( !selection.current.choice ||
+        selection.current.choice === "APPS" ) {
+        selection.current.choice = "APPS";
+        selection.current.selection = apps[0];
+        console.log(selection.current);
+      }
+    }
+    refresh();
 
     config.intents.forEach( intent => {
       const match = intent.triggers.find( trigger => {
@@ -552,6 +525,7 @@ const App = () => {
       const word = event.target.value.substring(start).trim();
       selection.current.text = word;
       if( word.length > 0 ) {
+        console.log(`word = ${word}`)
         if( selection.current.intent ) {
           updateOptions(word);
         } else {
