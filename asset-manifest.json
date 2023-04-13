@@ -1,16 +1,16 @@
 {
   "files": {
-    "main.css": "/synergy-launcher/static/css/main.70b06f7d.css",
-    "main.js": "/synergy-launcher/static/js/main.c4e3aaee.js",
+    "main.css": "/synergy-launcher/static/css/main.f105609d.css",
+    "main.js": "/synergy-launcher/static/js/main.8a2c3162.js",
     "static/js/787.fe6e5d4e.chunk.js": "/synergy-launcher/static/js/787.fe6e5d4e.chunk.js",
     "service-worker.js": "/synergy-launcher/service-worker.js",
     "index.html": "/synergy-launcher/index.html",
-    "main.70b06f7d.css.map": "/synergy-launcher/static/css/main.70b06f7d.css.map",
-    "main.c4e3aaee.js.map": "/synergy-launcher/static/js/main.c4e3aaee.js.map",
+    "main.f105609d.css.map": "/synergy-launcher/static/css/main.f105609d.css.map",
+    "main.8a2c3162.js.map": "/synergy-launcher/static/js/main.8a2c3162.js.map",
     "787.fe6e5d4e.chunk.js.map": "/synergy-launcher/static/js/787.fe6e5d4e.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.70b06f7d.css",
-    "static/js/main.c4e3aaee.js"
+    "static/css/main.f105609d.css",
+    "static/js/main.8a2c3162.js"
   ]
 }
