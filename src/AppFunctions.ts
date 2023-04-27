@@ -10,19 +10,90 @@ import {
 import IntentOption from './types/IntentOption';
 import InterestOption from './types/InterestOption';
 import SingleValue from './types/SingleValue';
-import Selection, { AdvanceDirection } from './types/Selection';
 import moment from 'moment';
 
-export const hasSelections = (selection: Selection) => {
-  return selection.choice && 
-    selection.choices.has(selection.choice) && 
-    (selection.choices.get(selection.choice!)?.length ?? 0) > 1;
+export const APPS = "APPS";
+
+export interface AppState {
+  choices: Map<string,IntentOption[] | Pwa[] | InterestOption[]>;
+  intent?: Intent;
+  interest?: InterestOption;
+  choice?: string;
+  selection?: Pwa | IntentOption | InterestOption;
+  selectionPosition?: number;
+  options: Map<string,Option[]>;
+  option?: string;
+  optionSelection?: Option | SingleValue;
+  fields: string[];
+  props: Map<string,string>;
+  propPositions: Map<number,string>;
+  maxPosition?: number;
 }
 
-export const hasOptions = (selection: Selection) => {
-  return selection.option && 
-    selection.options.has(selection.option) && 
-    (selection.options.get(selection.option!)?.length ?? 0) > 1;
+export enum AdvanceDirection {
+  Next,
+  Previous
+}
+
+const updateChoices = (
+  key: string,
+  arr: IntentOption[] | Pwa[] | InterestOption[],
+  state: AppState
+) => {
+  if( arr.length === 0 ) {
+    state.choices.delete(key);
+    if( state.choice === key ) {
+      advance(
+        state,
+        AdvanceDirection.Next
+      );
+    }
+  } else {
+    state.choices.set(key,arr);
+    if( !state.choice ||
+      state.choice === key ) {
+      state.choice = key;
+      state.selection = arr[0];
+    }
+  }
+}
+
+const updateOptions = (
+  key: string,
+  options: Option[],
+  state: AppState,
+) => {
+  if( options.length > 0 ) {
+    state.options.set(key,options);
+    if( !state.optionSelection ) {
+      state.option = key;
+      state.optionSelection = options[0];
+    }
+  } else {
+    state.options.delete(key);
+    if( state.option === key) {
+      state.option = undefined;
+      state.optionSelection = undefined;
+    }
+  }
+}
+
+export const hasSelections = (
+  choice: string | undefined,
+  choices: Map<string,IntentOption[] | Pwa[] | InterestOption[]>
+) => {
+  return choice && 
+    choices.has(choice) && 
+    (choices.get(choice!)?.length ?? 0) > 1;
+}
+
+export const hasOptions = (
+  option: string | undefined,
+  options: Map<string,Option[]>
+) => {
+  return option && 
+    options.has(option) && 
+    (options.get(option!)?.length ?? 0) > 1;
 } 
 
 export const getIntentText = (intent: IntentOption, text: string): string => {
@@ -106,60 +177,62 @@ const getIndex = <T extends Pwa | IntentOption | InterestOption> (items: T[], it
   return idx === items.length - 1 ? -1 : idx + 1;
 }
 
-export const advance = (selection: Selection, refresh: () => void, direction: AdvanceDirection) => {
-  const keys = Array.from(selection.choices.keys());
-  if( selection.choice ) {
-    const items = selection.choices.get(selection.choice);
+export const advance = (
+  state: AppState,
+  direction: AdvanceDirection,
+) => {
+  const keys = Array.from(state.choices.keys());
+  if( state.choice ) {
+    const items = state.choices.get(state.choice);
     if( items ) {
-      const idx = getIndex( items, selection.selection, direction);
+      const idx = getIndex( items, state.selection, direction);
       if( idx === -1 ) {
-        let grpIdx = keys.indexOf(selection.choice);
+        let grpIdx = keys.indexOf(state.choice);
         if( direction === AdvanceDirection.Next ) {
           grpIdx = ( grpIdx === keys.length -1 ) ? 0 : grpIdx + 1;
         } else {
           grpIdx = ( grpIdx === 0 ) ? keys.length -1 : grpIdx -1;
         }
-        const itemsList = selection.choices.get(keys[grpIdx])
+        const itemsList = state.choices.get(keys[grpIdx])
         if( itemsList && itemsList.length > 0) {
-          selection.selection = ( direction === AdvanceDirection.Next ) 
+          state.choice = keys[grpIdx];
+          state.selection = direction === AdvanceDirection.Next  
             ? itemsList[0]
-            : itemsList[itemsList.length-1];
-          selection.choice = keys[grpIdx];
+            : itemsList[itemsList.length-1]
         }
       } else {
-        selection.selection = items[idx];
+        state.selection = items[idx]
       }
-      refresh();
-      return;
     }
+    return;
   }
-  for (const [key,items] of selection.choices.entries()) {
+  for (const [key,items] of state.choices.entries()) {
     if( items.length > 0 ) {
-      selection.selection = items[0];
-      selection.choice = key;
-      return;
+      state.choice = key;
+      state.selection = items[0];
     }
   }
 }
 
-export const advanceType = (selection: Selection, refresh: () => void, direction: AdvanceDirection) => {
-  const keys = Array.from(selection.choices.keys());
-  if( selection.choice ) {
-    let grpIdx = keys.indexOf(selection.choice);
+export const advanceType = (
+  state: AppState,
+  direction: AdvanceDirection
+) => {
+  const keys = Array.from(state.choices.keys());
+  if( state.choice ) {
+    let grpIdx = keys.indexOf(state.choice);
     if( direction === AdvanceDirection.Next ) {
       grpIdx = ( grpIdx === keys.length -1 ) ? 0 : grpIdx + 1;
     } else {
       grpIdx = ( grpIdx === 0 ) ? keys.length -1 : grpIdx -1;
     }
-    const itemsList = selection.choices.get(keys[grpIdx])
+    const itemsList = state.choices.get(keys[grpIdx])
     if( itemsList && itemsList.length > 0) {
-      selection.selection = ( direction === AdvanceDirection.Next ) 
+      state.selection = direction === AdvanceDirection.Next  
         ? itemsList[0]
         : itemsList[itemsList.length-1];
-      selection.choice = keys[grpIdx];
+      state.choice = keys[grpIdx];
     }
-    refresh();
-    return;
   }
 }
 
@@ -177,37 +250,40 @@ const getOptionIndex = (items: Option[], item: Option | undefined, direction: Ad
   return idx === items.length - 1 ? -1 : idx + 1;
 }
 
-export const advanceOptions = (selection: Selection, refresh: () => void, direction: AdvanceDirection) => {
-  const keys = Array.from(selection.options.keys());
-  if( selection.option ) {
-    const items = selection.options.get(selection.option);
+export const advanceOptions = (
+  state: AppState,
+  direction: AdvanceDirection,
+) => {
+  const keys = Array.from(state.options.keys());
+  if( state.option ) {
+    const items = state.options.get(state.option);
     if( items ) {
-      const idx = getOptionIndex( items, selection.optionSelection, direction);
+      const idx = getOptionIndex( items, state.optionSelection, direction);
       if( idx === -1 ) {
-        let grpIdx = keys.indexOf(selection.option);
+        let grpIdx = keys.indexOf(state.option);
         if( direction === AdvanceDirection.Next ) {
           grpIdx = ( grpIdx === keys.length -1 ) ? 0 : grpIdx + 1;
         } else {
           grpIdx = ( grpIdx === 0 ) ? keys.length -1 : grpIdx -1;
         }
-        const itemsList = selection.options.get(keys[grpIdx])
+        const itemsList = state.options.get(keys[grpIdx])
         if( itemsList && itemsList.length > 0) {
-          selection.optionSelection = ( direction === AdvanceDirection.Next ) 
+          
+          state.optionSelection = direction === AdvanceDirection.Next 
             ? itemsList[0]
             : itemsList[itemsList.length-1];
-          selection.option = keys[grpIdx];
+          state.option = keys[grpIdx];
         }
       } else {
-        selection.optionSelection = items[idx];
+        state.optionSelection = items[idx];
       }
-      refresh();
       return;
     }
   }
-  for (const [key,items] of selection.choices.entries()) {
+  for (const [key,items] of state.options.entries()) {
     if( items.length > 0 ) {
-      selection.selection = items[0];
-      selection.choice = key;
+      state.optionSelection = items[0];
+      state.option = key;
       return;
     }
   }
@@ -235,26 +311,25 @@ const convertValue = (type: string, text: string, expression?: string, formats?:
         : text;
 }
 
-export const updateSingleValueOptions = (field: Field, text: string, type: string, selection: Selection) => {
-  if( (field.matchPatten && text.match(field.matchPatten)) ||
-      (field.matchExpresion && eval(`const val="${text}"; ${field.matchExpresion}`) === true) ||
-      matches(type, text, field.dateFormats) ) {
-    const option: SingleValue = {
+export const updateSingleValueOptions = (
+    field: Field, 
+    text: string, 
+    type: string, 
+    state: AppState
+  ) => {
+  const options: SingleValue[] = (field.matchPatten && text.match(field.matchPatten)) ||
+    (field.matchExpresion && eval(`const val="${text}"; ${field.matchExpresion}`) === true) ||
+    matches(type, text, field.dateFormats)
+    ? [{
       value: convertValue(type, text, field.valueExpresion, field.dateFormats),
       type
-    }
-    selection.options.set(field.name, [option]);
-    if( !selection.optionSelection ) {
-      selection.option = field.name;
-      selection.optionSelection = option;
-    }
-  } else {
-    selection.options.delete(field.name);
-    if( selection.option === field.name) {
-      selection.option = undefined;
-      selection.optionSelection = undefined;
-    }
-  }
+    }]
+    : []
+  updateOptions(
+    field.name,
+    options,
+    state
+  );
 }
 
 export const updateOptionChoices = (
@@ -262,33 +337,21 @@ export const updateOptionChoices = (
   lists: Map<string,Option[]>, 
   type: string,
   text: string,
-  selection: Selection,
-  refresh: () => void
+  state: AppState
 ) => {
   const choice = choices.find( choice => choice.key.toLowerCase() === type);
   if( choice ) {
-    let options: Option[] = [];
     if( choice.list && lists.has(choice.list) ) {
-      
-      options = lists.get(choice.list)?.filter( (opt: Option | string) => {
+      const availableOptions = lists.get(choice.list)?.filter( (opt: Option | string) => {
         return (choice.ignoreCase ?? true)
           ? ((opt as Option).display ?? (opt as Option).value).toLowerCase().startsWith(text.toLowerCase())
           : ((opt as Option).display ?? (opt as Option).value).startsWith(text);
         }) ?? [];
-      if( options.length > 0 ) {
-        selection.options.set(choice.key, options);
-        if( !selection.optionSelection ) {
-            selection.option = choice.key;
-            selection.optionSelection = options[0];
-        }
-      } else {
-        selection.options.delete(choice.key);
-        if( selection.option === choice.key) {
-          selection.option = undefined;
-          selection.optionSelection = undefined;
-        }
-      }
-      refresh();
+      updateOptions(
+        choice.key,
+        availableOptions,
+        state
+      );
     } 
   }
 }
@@ -296,33 +359,16 @@ export const updateOptionChoices = (
 export const updateApps = (
   pwas: Pwa[],
   text: string,
-  selection: Selection,
-  refresh: () => void
+  state: AppState
 ) => {
   const apps = pwas.filter( pwa => pwa.title.toLowerCase().startsWith(text.toLowerCase()));
-  if( apps.length === 0 ) {
-    selection.choices.delete("APPS");
-    if( selection.choice === "APPS" ) {
-      selection.choice = undefined;
-      selection.selection = undefined;
-      advance(selection, refresh, AdvanceDirection.Next);
-    }
-  } else {
-    selection.choices.set("APPS", apps)
-    if( !selection.choice ||
-      selection.choice === "APPS" ) {
-      selection.choice = "APPS";
-      selection.selection = apps[0];
-    }
-  }
-  refresh();
+  updateChoices(APPS, apps, state);
 }
 
 export const updateIntents = (
   intents: Intent[],
   text: string,
-  selection: Selection,
-  refresh: () => void
+  state: AppState
 ) => {
   intents.forEach( intent => {
     const match = intent.triggers.find( trigger => {
@@ -330,28 +376,16 @@ export const updateIntents = (
         ? trigger.toLowerCase().startsWith(text.toLowerCase()) 
         : trigger.startsWith(text) 
     });
-    if( match ) {
-      const intentOption: IntentOption = {
-        action: intent.action,
-        domain: intent.domain,
-        subDomain: intent.subDomain,
-        text: match
-      }
-      selection.choices.set(intent.action, [intentOption])
-      if( !selection.choice || 
-        selection.choice === intent.action ) {
-        selection.choice = intent.action;
-        selection.selection = intentOption;
-      }
-    } else {
-      selection.choices.delete(intent.action);
-      if( selection.choice === intent.action ) {
-        selection.choice = undefined;
-        selection.selection = undefined;
-        advance(selection, refresh, AdvanceDirection.Next);
-      }
-    }
-    refresh();
+
+    const arr: IntentOption[] | undefined = match
+      ? [{
+          action: intent.action,
+          domain: intent.domain,
+          subDomain: intent.subDomain,
+          text: match
+        }]
+      : [];
+    updateChoices(intent.action, arr, state);
   });
 }
 
@@ -359,39 +393,25 @@ export const updateInterests = (
   interests: Interest[],
   lists: Map<string,Option[]>,
   text: string,
-  selection: Selection,
-  refresh: () => void
+  state: AppState
 ) => {
   interests.forEach( interest => {
     if (interest.list && lists.has(interest.list) ) {
       const options = lists.get(interest.list)?.filter( (opt: Option | string) => {
         return ((opt as Option).display ?? (opt as Option).value).toLowerCase().startsWith(text.toLowerCase());
         });
-      if( options && options.length > 0 ) {
-        const intrestOptions: InterestOption[] = options.map( value => {
-          return {
-            topic: interest.topic,
-            domain: interest.domain,
-            subDomain: interest.subDomain,
-            text: value.value,
-            body: value.body
-          }
-        });
-        selection.choices.set(interest.topic, intrestOptions)
-        if( !selection.choice || 
-          selection.choice === interest.topic ) {
-          selection.choice = interest.topic;
-          selection.selection = intrestOptions[0];
-        }
-      } else {
-        selection.choices.delete(interest.topic);
-        if( selection.choice === interest.topic ) {
-          selection.choice = undefined;
-          selection.selection = undefined;
-          advance(selection, refresh, AdvanceDirection.Next);
-        }
-      }
-      refresh();
+      const arr: InterestOption[] = options && options.length > 0
+        ? options.map( value => {
+            return {
+                topic: interest.topic,
+                domain: interest.domain,
+                subDomain: interest.subDomain,
+                text: value.value,
+                body: value.body
+              }
+          })
+        : [];
+      updateChoices(interest.topic, arr, state);
     }
   });
 }

@@ -1,0 +1,25 @@
+
+.iconGroup {
+  font-size: small;
+  margin-right: 12px;
+}
+
+.iconTop {
+  position: absolute;
+  top: 0;
+  color: black;
+}
+
+.iconTop:hover {
+  color: darkgray;
+}
+
+.iconBottom {
+  position: absolute;
+  bottom: 0;
+  color: black;
+}
+
+.iconBottom:hover {
+  color: darkgray;
+}
