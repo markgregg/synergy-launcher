@@ -7,9 +7,11 @@ import {
   Intent, 
   Option, 
 } from 'synergy-client';
-import IntentOption from './types/IntentOption';
-import InterestOption from './types/InterestOption';
-import SingleValue from './types/SingleValue';
+import {
+  IntentOption,
+  InterestOption,
+  SingleValue 
+} from '../types';
 import moment from 'moment';
 
 export const APPS = "APPS";

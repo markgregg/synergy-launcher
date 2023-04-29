@@ -1,5 +1,10 @@
-import { useState, KeyboardEvent, ChangeEvent, useRef, useEffect } from 'react';
-
+import { 
+  useState, 
+  KeyboardEvent, 
+  ChangeEvent, 
+  useRef, 
+  useEffect 
+} from 'react';
 import { 
   getLaunchConfig, 
   launchPwa, 
@@ -10,11 +15,29 @@ import {
   Option, 
   LaunchConfig
 } from 'synergy-client';
-import IntentOption from './types/IntentOption';
-import InterestOption from './types/InterestOption';
-import './App.css';
-import { advance, AdvanceDirection, advanceOptions, advanceType, AppState, getOptionText, getSearchText, getSelectionText, hasOptions, hasSelections, updateApps, updateIntents, updateInterests, updateOptionChoices, updateSingleValueOptions } from './AppFunctions';
-import ButtonGroup from './components/ButtonGroup';
+import { 
+  IntentOption, 
+  InterestOption 
+} from '../types';
+import './SynergyLauncher.css';
+import { 
+  advance, 
+  AdvanceDirection, 
+  advanceOptions, 
+  advanceType, 
+  AppState, 
+  getOptionText, 
+  getSearchText, 
+  getSelectionText, 
+  hasOptions, 
+  hasSelections, 
+  updateApps, 
+  updateIntents, 
+  updateInterests, 
+  updateOptionChoices, 
+  updateSingleValueOptions 
+} from './SynergyLauncherFunctions';
+import ButtonGroup from '../components/ButtonGroup';
 
 const App = () => {
   const textCopyRef = useRef<HTMLSpanElement>(null);
@@ -58,7 +81,7 @@ const App = () => {
       observer.observe(textRef);
       return () => observer.unobserve(textRef);
     }
-  },[textCopyRef.current])
+  },[])
 
 
   const clearSelectedItem = () => {
